@@ -1,4 +1,4 @@
-# Official Web3 Domains Smart Contracts
+# Official Smart Contracts
 
 Smart Contract Deployment Supports EVM
 
