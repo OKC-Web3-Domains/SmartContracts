@@ -388,47 +388,6 @@ abstract contract ERC165 is IERC165 {
 pragma solidity ^0.8.0;
 
 /**
- * @title Counters
- * @author Matt Condon (@shrugs)
- * @dev Provides counters that can only be incremented, decremented or reset. This can be used e.g. to track the number
- * of elements in a mapping, issuing ERC721 ids, or counting request ids.
- *
- * Include with `using Counters for Counters.Counter;`
- */
-library Counters {
-    struct Counter {
-        // This variable should never be directly accessed by users of the library: interactions must be restricted to
-        // the library's function. As of Solidity v0.5.2, this cannot be enforced, though there is a proposal to add
-        // this feature: see https://github.com/ethereum/solidity/issues/4637
-        uint256 _value; // default: 0
-    }
-
-    function current(Counter storage counter) internal view returns (uint256) {
-        return counter._value;
-    }
-
-    function increment(Counter storage counter) internal {
-        unchecked {
-            counter._value += 1;
-        }
-    }
-
-    function decrement(Counter storage counter) internal {
-        uint256 value = counter._value;
-        require(value > 0, "Counter: decrement overflow");
-        unchecked {
-            counter._value = value - 1;
-        }
-    }
-
-    function reset(Counter storage counter) internal {
-        counter._value = 0;
-    }
-}
-
-pragma solidity ^0.8.0;
-
-/**
  * @dev String operations.
  */
 library Strings {
@@ -2346,9 +2305,21 @@ abstract contract WhiteList is AdminControl {
     mapping(address => uint256) public _whiteList;
 	
 	bool public isWhiteListActive = false;
+	
+	bool public isWhiteList4Discount = false; // WL for discount
+	
+	uint256 public WhiteListDiscount = 0; // percent
 
     function setWhiteListActive(bool _isWhiteListActive) external onlyOwner {
         isWhiteListActive = _isWhiteListActive;
+    }
+	
+	function setWhiteList4Discount() external onlyOwner {
+        isWhiteList4Discount = !isWhiteList4Discount;
+    }
+	
+	function setWhiteListDiscount(uint256 amount) external onlyOwner {
+        WhiteListDiscount = amount;
     }
 
     function addWhiteLists(address[] calldata accounts, uint256 numbers) external onlyMinterController {
@@ -2430,14 +2401,20 @@ contract Web3Domains is ERC721, ERC721Enumerable, AdminControl, RecordStorage, W
 	bool public _saleIsActive = true;
 	
 	bool public _saleTwoCharIsActive = false;
+	
+	bool public _saleOneCharIsActive = false;
 
-	uint256 private _price = 1;
+	uint256 private _price = 1 ether;
 	
-	uint256 private _2chartimes = 100;
+	uint256 private _1chartimes = 1000;
 	
-	uint256 private _3chartimes = 20;
+	uint256 private _2chartimes = 200;
 	
-	uint256 private _4chartimes = 5;
+	uint256 private _3chartimes = 30;
+	
+	uint256 private _4chartimes = 6;
+	
+	uint256 private _5chartimes = 1;
 	
     modifier onlyApprovedOrOwner(uint256 tokenId) {
         require(
@@ -2446,7 +2423,7 @@ contract Web3Domains is ERC721, ERC721Enumerable, AdminControl, RecordStorage, W
         _;
     }
 	
-	constructor() ERC721("OKC Web3 Domains", "OWD") {
+	constructor() ERC721("OKXChain Web3 Domains", "OWD") {
 		
 	}
 	
@@ -2510,7 +2487,8 @@ contract Web3Domains is ERC721, ERC721Enumerable, AdminControl, RecordStorage, W
         return _4chartimes;
     }
 	
-	function setTimes(uint256 _2chartimenew, uint256 _3chartimenew, uint256 _4chartimenew) public onlyOwner {
+	function setTimes(uint256 _1chartimenew, uint256 _2chartimenew, uint256 _3chartimenew, uint256 _4chartimenew) public onlyOwner {
+		_1chartimes = _1chartimenew;
 		_2chartimes = _2chartimenew;
         _3chartimes = _3chartimenew;
 		_4chartimes = _4chartimenew;
@@ -2522,6 +2500,10 @@ contract Web3Domains is ERC721, ERC721Enumerable, AdminControl, RecordStorage, W
 	
 	function setSaleStateTwoChar() public onlyOwner {
         _saleTwoCharIsActive = !_saleTwoCharIsActive;
+    }
+	
+	function setSaleStateOneChar() public onlyOwner {
+        _saleOneCharIsActive = !_saleOneCharIsActive;
     }
 	
 	function setTLD(string memory _tld) public onlyOwner {
@@ -2588,7 +2570,7 @@ contract Web3Domains is ERC721, ERC721Enumerable, AdminControl, RecordStorage, W
 		
 		require(_length != 0, "Domain must be non-empty");	
 		
-		require(_length >= 2, "Domain requires at least 2 characters");	
+		//require(_length >= 1, "Domain requires at least 1 characters");	
 		
 		  // Check BookingList
 		if (_isBookingListActive == true){
@@ -2596,34 +2578,69 @@ contract Web3Domains is ERC721, ERC721Enumerable, AdminControl, RecordStorage, W
 			require(bytes(name).length == 0, "This name is already reserved");
 		}
 		
-		
+		uint256 _WhiteListDiscount = 0;
 	    // Check WhiteList
 		if (isWhiteListActive == true){
 			uint256 numbers = _whiteList[msg.sender];
-			require(numbers > 0, "The address is not in the Whitelist");
-			require(numbers >= balanceOf(msg.sender), "Exceeded max available to purchase");
+			if (isWhiteList4Discount == false){
+				require(numbers > 0, "The address is not in the Whitelist");
+				require(numbers >= balanceOf(msg.sender), "Exceeded max available to purchase");
+			}
+			else{
+				if (numbers > 0){
+					_WhiteListDiscount = WhiteListDiscount;
+				}
+			}
+		}
+		
+		if (_length == 1)
+		{
+			require(_saleOneCharIsActive == true, "1 Character domain names need to be allowed to buy");
+			
+			uint256 __price1 = getPrice().mul(_1chartimes);
+			if (_WhiteListDiscount > 0){
+				__price1 = __price1 * ((100-_WhiteListDiscount)/100);
+			}
+	
+			require(msg.value >= __price1, "Insufficient Token or Token value sent is not correct");
 		}
 		
 		if (_length == 2)
 		{
 			require(_saleTwoCharIsActive == true, "2 Character domain names need to be allowed to buy");
+			uint256 __price2 = getPrice().mul(_2chartimes);
+			if (_WhiteListDiscount > 0){
+				__price2 = __price2 * ((100-_WhiteListDiscount)/100);
+			}
 			
-			require(msg.value >= getPrice().mul(_2chartimes), "Insufficient Token or Token value sent is not correct");
+			require(msg.value >= __price2, "Insufficient Token or Token value sent is not correct");
 		}
 	
 		if (_length == 3)
 		{
-			require(msg.value >= getPrice().mul(_3chartimes), "Insufficient Token or Token value sent is not correct");
+			uint256 __price3 = getPrice().mul(_3chartimes);
+			if (_WhiteListDiscount > 0){
+				__price3 = __price3 * ((100-_WhiteListDiscount)/100);
+			}
+			require(msg.value >= __price3, "Insufficient Token or Token value sent is not correct");
 		}
 		
 		if (_length == 4)
 		{
-			require(msg.value >= getPrice().mul(_4chartimes), "Insufficient Token or Token value sent is not correct");
+			uint256 __price4 = getPrice().mul(_4chartimes);
+			if (_WhiteListDiscount > 0){
+				__price4 = __price4 * ((100-_WhiteListDiscount)/100);
+			}
+			require(msg.value >= __price4, "Insufficient Token or Token value sent is not correct");
 		}
 		
 		if (_length >= 5)
 		{
-			require(msg.value >= getPrice(), "Insufficient Token or Token value sent is not correct");
+			uint256 __price5 = getPrice();
+			if (_WhiteListDiscount > 0){
+				__price5 = __price5 * ((100-_WhiteListDiscount)/100);
+			}
+			require(msg.value >= __price5, "Insufficient Token or Token value sent is not correct");
 		}
 		
 		string memory _domain = StringUtil.toLower(domain);
